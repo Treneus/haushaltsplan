@@ -1,7 +1,24 @@
 # Anleitung: Haushaltsplan einrichten und benutzen
 
 Diese Anleitung führt Schritt für Schritt durch die Einrichtung.
-**Teil A und B macht ein Erwachsener einmalig**, danach (Teil C–E) können alle die App benutzen.
+**Teil 0, A und B werden einmalig erledigt** (Supabase am besten von einem Erwachsenen),
+danach (Teil C–E) können alle die App benutzen.
+
+---
+
+## Teil 0 – App online stellen mit GitHub Pages (2 Minuten, einmalig)
+
+Mit einem kostenlosen GitHub-Konto funktioniert GitHub Pages nur bei **öffentlichen** Repositories.
+Das ist unbedenklich: Im Code stehen keine Geheimnisse (der Supabase-Publishable-Key darf öffentlich
+sein, alle Daten sind verschlüsselt und liegen nicht auf GitHub).
+
+1. Auf GitHub das Repository **Treneus/haushaltsplan** öffnen → **Settings**
+2. Ganz unten bei **Danger Zone** → **Change visibility** → **Change to public** → bestätigen
+3. Links im Menü **Pages** öffnen
+4. Bei **Source**: **Deploy from a branch** wählen
+5. Bei **Branch**: **main** und **/ (root)** wählen → **Save**
+6. 1–2 Minuten warten. Oben erscheint dann: *Your site is live at*
+   **https://treneus.github.io/haushaltsplan/**
 
 ---
 

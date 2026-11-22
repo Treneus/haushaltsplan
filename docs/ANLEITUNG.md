@@ -45,7 +45,7 @@ sondern nur auf euren Geräten und in eurem iCloud-Ordner.
 
 ### Das erste Mal synchronisieren (dieselbe Person)
 
-1. In der App: Profil-Knopf → **Jetzt synchronisieren**
+1. In der App oben auf den **Sync-Knopf** (die zwei kreisenden Pfeile) tippen
 2. Bei Schritt 1 auf **„Es gibt noch keine Datei“** tippen
 3. Bei Schritt 2 auf **Speichern** → **„In Dateien sichern“** → den Ordner **Haushaltsplan** wählen → **Sichern**
 
@@ -55,7 +55,7 @@ Jetzt liegt im Ordner die Datei **haushaltsplan-sync.json**.
 
 ## Teil C – Synchronisieren (alle, so oft ihr wollt)
 
-1. Profil-Knopf → **Jetzt synchronisieren**
+1. Oben auf dem Startbildschirm auf den **Sync-Knopf** (die zwei kreisenden Pfeile) tippen
 2. **Schritt 1 – Datei auswählen:** im Ordner **Haushaltsplan** die Datei **haushaltsplan-sync.json** antippen.
    Die App zeigt an, wie viele Einträge von den anderen übernommen wurden.
 3. **Schritt 2 – Speichern:** **„In Dateien sichern“** → Ordner **Haushaltsplan** → **Sichern** →
@@ -64,7 +64,7 @@ Jetzt liegt im Ordner die Datei **haushaltsplan-sync.json**.
 Fertig – jetzt sind deine Einträge für die anderen da, und du hast alle Einträge der anderen.
 
 **Wann synchronisieren?** Am besten, nachdem du etwas eingetragen hast, oder einmal am Tag.
-Der kleine Punkt am Profil-Knopf hilft:
+Der kleine Punkt am Sync-Knopf hilft:
 
 - 🟢 alles ist in iCloud
 - 🟡 es gibt Änderungen, die noch nicht in iCloud sind
@@ -82,7 +82,7 @@ Der kleine Punkt am Profil-Knopf hilft:
 | Ausgabe hinzufügen | In einer Kategorie **+** → Betrag, Beschreibung, Datum |
 | Datum ändern | Ins Datumsfeld tippen oder **Gestern** wählen (Standard: heute) |
 | Ausgabe löschen | Nach links wischen oder **✕** – 4 Sekunden lang **Rückgängig** möglich |
-| Abgleichen | Profil-Knopf → **Jetzt synchronisieren** |
+| Abgleichen | **Sync-Knopf** oben auf dem Startbildschirm (oder Profil-Knopf → **Jetzt synchronisieren**) |
 | Wer macht mit? | Profil-Knopf → **Im Haushalt** (alle Geräte, die schon synchronisiert haben) |
 
 ---

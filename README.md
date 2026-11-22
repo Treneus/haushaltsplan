@@ -28,7 +28,7 @@ Eine einfache, schnelle Web-App, in der die ganze Familie ihre Ausgaben sammelt 
 
 1. App-Link in **Safari** öffnen → **Teilen** → **„Zum Home-Bildschirm“**
 2. In der **Dateien-App** unter iCloud Drive einen Ordner **„Haushaltsplan“** anlegen und mit der Familie teilen
-3. In der App: Profil-Knopf → **Jetzt synchronisieren**
+3. In der App oben auf den **Sync-Knopf** tippen
 
 📖 Ausführlich: **[docs/ANLEITUNG.md](docs/ANLEITUNG.md)**
 

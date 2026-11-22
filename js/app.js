@@ -783,6 +783,7 @@ document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('clic
 $('#undoBtn').addEventListener('click', runUndo);
 
 $('#syncOpenBtn').addEventListener('click', openSyncSheet);
+$('#homeSyncBtn').addEventListener('click', openSyncSheet);
 
 document.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Escape') return;

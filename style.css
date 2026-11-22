@@ -468,6 +468,11 @@ button, .row-fg, .chip span { touch-action: manipulation; }
   border-radius: 50%;
 }
 .avatar-btn { position: relative; }
+.top-actions { display: flex; gap: 8px; margin: -6px -6px 0 0; }
+.top-actions .avatar-btn { margin: 0; }
+.sync-btn { display: grid; place-items: center; }
+.sync-btn svg { transition: transform .5s var(--ease); }
+.sync-btn:active svg { transform: rotate(-180deg); }
 .avatar-dot {
   position: absolute;
   right: 1px;

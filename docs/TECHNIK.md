@@ -137,7 +137,7 @@ Datei auf die Geräte der Familie. Ein eigener Server ist nicht nötig.
 
 ## Synchronisation über iCloud Drive
 
-**Ablauf (Sync-Fenster in den Einstellungen):**
+**Ablauf (Sync-Fenster – geöffnet über den Sync-Knopf auf dem Startbildschirm oder in den Einstellungen):**
 
 1. **Datei öffnen** – Nutzer wählt `haushaltsplan-sync.json` (oder mehrere Dateien).
    Jeder gültige Record wird mit `store.merge` übernommen, wenn er neuer ist.
@@ -161,7 +161,7 @@ kommen sie beim nächsten Abgleich dieses Geräts automatisch zurück (eventual 
 **„Beide behalten“ statt „Ersetzen“:** Die Dateiauswahl erlaubt mehrere Dateien
 (`multiple`), alle werden zusammengeführt. Doppelte Dateien schaden daher nicht.
 
-**Statuspunkt:** `unsyncedCount()` zählt eigene Records mit `updatedAt > exportedAt`.
+**Statuspunkt** (am Sync-Knopf): `unsyncedCount()` zählt eigene Records mit `updatedAt > exportedAt`.
 🟢 = 0 offene Änderungen, 🟡 = offene Änderungen, kein Punkt = noch nie synchronisiert.
 
 ## Dateiformat der Sync-Datei

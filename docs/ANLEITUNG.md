@@ -1,16 +1,14 @@
 # Anleitung: Haushaltsplan einrichten und benutzen
 
-Diese Anleitung führt Schritt für Schritt durch die Einrichtung.
-**Teil 0, A und B werden einmalig erledigt** (Supabase am besten von einem Erwachsenen),
-danach (Teil C–E) können alle die App benutzen.
+**Teil 0 wird einmalig erledigt**, danach (Teil A–D) können alle die App benutzen.
 
 ---
 
 ## Teil 0 – App online stellen mit GitHub Pages (2 Minuten, einmalig)
 
 Mit einem kostenlosen GitHub-Konto funktioniert GitHub Pages nur bei **öffentlichen** Repositories.
-Das ist unbedenklich: Im Code stehen keine Geheimnisse (der Supabase-Publishable-Key darf öffentlich
-sein, alle Daten sind verschlüsselt und liegen nicht auf GitHub).
+Das ist unbedenklich: Im Code stehen keine Geheimnisse, und eure Ausgaben liegen nicht auf GitHub,
+sondern nur auf euren Geräten und in eurem iCloud-Ordner.
 
 1. Auf GitHub das Repository **Treneus/haushaltsplan** öffnen → **Settings**
 2. Ganz unten bei **Danger Zone** → **Change visibility** → **Change to public** → bestätigen
@@ -22,163 +20,104 @@ sein, alle Daten sind verschlüsselt und liegen nicht auf GitHub).
 
 ---
 
-## Teil A – Supabase einrichten (ca. 10 Minuten, einmalig)
-
-Supabase ist ein Online-Dienst, über den sich die Handys abgleichen.
-Für eine Familie ist er kostenlos. Er speichert nur verschlüsselte Daten.
-
-### 1. Konto und Projekt anlegen
-
-1. Auf **https://supabase.com** gehen → **Start your project** → mit E-Mail oder GitHub registrieren
-2. **New project** anklicken
-3. Ausfüllen:
-   - **Name:** `haushaltsplan`
-   - **Database Password:** auf **Generate a password** klicken (wird nicht weiter gebraucht, aber sicher aufheben)
-   - **Region:** **Central EU (Frankfurt)** – dann bleiben die Daten in Deutschland
-4. **Create new project** – etwa 1–2 Minuten warten
-
-### 2. Datenbank einrichten
-
-1. Links im Menü **SQL Editor** öffnen
-2. **New query** anklicken
-3. Den kompletten Inhalt der Datei [`supabase/setup.sql`](../supabase/setup.sql) hineinkopieren
-   (auf GitHub die Datei öffnen → oben rechts auf das Kopier-Symbol klicken)
-4. Unten rechts auf **Run** klicken → es sollte **„Success. No rows returned“** erscheinen
-
-> Supabase fragt eventuell nach, ob die Abfrage „destruktive Operationen“ enthält –
-> das liegt an den `drop policy if exists`-Zeilen. Einfach bestätigen.
-
-### 3. Anonyme Anmeldung einschalten
-
-Die Handys melden sich automatisch und unsichtbar an – ohne E-Mail oder Passwort.
-Dafür muss eine Einstellung eingeschaltet werden:
-
-1. Links im Menü **Authentication** → **Sign In / Providers**
-2. **Allow anonymous sign-ins** einschalten
-3. **Save** klicken
-
-### 4. Adresse und Schlüssel kopieren
-
-1. Links unten **Project Settings** (Zahnrad) → **API Keys**
-2. Den **Publishable key** kopieren (beginnt mit `sb_publishable_…`)
-3. Unter **Project Settings → Data API** (oder oben auf der Projektseite) die **Project URL** kopieren
-   (sieht aus wie `https://abcdefghijkl.supabase.co`)
-
-> ⚠️ Niemals den **Secret key** (`sb_secret_…`) bzw. `service_role`-Key verwenden oder weitergeben!
-> Der Publishable key dagegen darf öffentlich sein.
-
----
-
-## Teil B – Werte in die App eintragen (einmalig)
-
-1. Auf GitHub im Repository die Datei **`config.js`** öffnen
-2. Oben rechts auf den **Stift** (Edit) klicken
-3. Die beiden Werte zwischen die Anführungszeichen einfügen:
-
-   ```js
-   window.HAUSHALT_CONFIG = {
-     supabaseUrl: 'https://abcdefghijkl.supabase.co',
-     supabaseKey: 'sb_publishable_xxxxxxxxxxxxxxxxxxxx',
-   };
-   ```
-
-4. **Commit changes…** → **Commit changes** klicken
-5. 1–2 Minuten warten, bis GitHub Pages die neue Version veröffentlicht hat
-
----
-
-## Teil C – App auf dem iPhone installieren (jedes Familienmitglied)
+## Teil A – App auf dem iPhone installieren (jedes Familienmitglied)
 
 1. **https://treneus.github.io/haushaltsplan/** in **Safari** öffnen
 2. Unten auf **Teilen** (Quadrat mit Pfeil nach oben) tippen
 3. Nach unten scrollen → **„Zum Home-Bildschirm“** → **Hinzufügen**
 4. Ab jetzt die App **immer über das neue Symbol** starten
+5. In der App oben rechts auf den **runden Profil-Knopf** → **Nutzername** eintragen → **Speichern**
 
 > Wichtig: Auf dem iPhone sind die Daten in Safari und in der App vom Home-Bildschirm
-> getrennt. Wer die App in Safari benutzt, riskiert außerdem, dass Safari die Daten nach
+> getrennt. Wer die App nur in Safari benutzt, riskiert außerdem, dass Safari die Daten nach
 > einiger Zeit ohne Nutzung löscht. Deshalb: immer das Symbol benutzen.
 
 ---
 
-## Teil D – Haushalt verbinden
+## Teil B – Gemeinsamen iCloud-Ordner anlegen (eine Person, einmalig)
 
-### Die erste Person: Haushalt erstellen
+1. Die App **Dateien** öffnen → **Durchsuchen** → **iCloud Drive**
+2. Oben rechts auf **⋯** → **Neuer Ordner** → Name: **Haushaltsplan**
+3. Den Ordner **gedrückt halten** → **Teilen** → **Ordner teilen** (bzw. „Personen hinzufügen“)
+4. Familienmitglieder einladen (über Nachrichten oder Mail) und bei
+   **Freigabeoptionen** „**Änderungen vornehmen**“ erlauben
+5. Die anderen nehmen die Einladung an – der Ordner erscheint dann bei ihnen ebenfalls in iCloud Drive
 
-1. In der App oben rechts auf den **runden Profil-Knopf** tippen
-2. Nutzernamen eintragen → **Speichern**
-3. Unter **Haushalt** auf **Haushalt erstellen** tippen
-4. Ein **Haushalts-Passwort** ausdenken (mindestens 8 Zeichen), zweimal eingeben → **Erstellen**
-5. Es erscheint der **Haushalts-Code**, z. B. `K7Q2-M9XA`
+### Das erste Mal synchronisieren (dieselbe Person)
 
-> 🔑 **Das Passwort gut aufschreiben!** Es lässt sich nicht zurücksetzen.
-> Ohne Passwort kann niemand mehr beitreten und die Daten auf dem Server sind nicht lesbar
-> (auf den Handys bleiben sie natürlich erhalten).
+1. In der App: Profil-Knopf → **Jetzt synchronisieren**
+2. Bei Schritt 1 auf **„Es gibt noch keine Datei“** tippen
+3. Bei Schritt 2 auf **Speichern** → **„In Dateien sichern“** → den Ordner **Haushaltsplan** wählen → **Sichern**
 
-### Alle anderen: beitreten
-
-1. App öffnen → Profil-Knopf → Nutzernamen eintragen → **Speichern**
-2. Unter **Haushalt** auf **Beitreten** tippen
-3. **Haushalts-Code** und **Passwort** eingeben → **Beitreten**
-4. Nach wenigen Sekunden erscheinen alle Ausgaben der Familie
-
-Unter **Im Haushalt** sieht man, welche Geräte verbunden sind und wann sie zuletzt aktiv waren.
+Jetzt liegt im Ordner die Datei **haushaltsplan-sync.json**.
 
 ---
 
-## Teil E – Bedienung
+## Teil C – Synchronisieren (alle, so oft ihr wollt)
+
+1. Profil-Knopf → **Jetzt synchronisieren**
+2. **Schritt 1 – Datei auswählen:** im Ordner **Haushaltsplan** die Datei **haushaltsplan-sync.json** antippen.
+   Die App zeigt an, wie viele Einträge von den anderen übernommen wurden.
+3. **Schritt 2 – Speichern:** **„In Dateien sichern“** → Ordner **Haushaltsplan** → **Sichern** →
+   bei der Frage nach der vorhandenen Datei **„Ersetzen“** wählen
+
+Fertig – jetzt sind deine Einträge für die anderen da, und du hast alle Einträge der anderen.
+
+**Wann synchronisieren?** Am besten, nachdem du etwas eingetragen hast, oder einmal am Tag.
+Der kleine Punkt am Profil-Knopf hilft:
+
+- 🟢 alles ist in iCloud
+- 🟡 es gibt Änderungen, die noch nicht in iCloud sind
+- ohne Punkt: noch nie synchronisiert
+
+---
+
+## Teil D – Bedienung
 
 | Was | Wie |
 |---|---|
 | Kategorie öffnen | Kategorie antippen |
 | Kategorie hinzufügen | Auf dem Startbildschirm **+** → Name und Symbol wählen |
-| Kategorie löschen | Nach links wischen oder **✕** → **„Löschen“** eintippen → bestätigen (löscht auch alle Ausgaben darin, auf allen Geräten) |
+| Kategorie löschen | Nach links wischen oder **✕** → **„Löschen“** eintippen → bestätigen (löscht auch alle Ausgaben darin – beim nächsten Abgleich auf allen Geräten) |
 | Ausgabe hinzufügen | In einer Kategorie **+** → Betrag, Beschreibung, Datum |
 | Datum ändern | Ins Datumsfeld tippen oder **Gestern** wählen (Standard: heute) |
 | Ausgabe löschen | Nach links wischen oder **✕** – 4 Sekunden lang **Rückgängig** möglich |
-| Sofort abgleichen | Einstellungen → **Jetzt synchronisieren** (passiert sonst automatisch) |
-| Familie einladen | Einstellungen → **Code teilen** |
-| Haushalt verlassen | Einstellungen → **Verlassen** → nochmal tippen. Die eigenen Daten bleiben auf dem Gerät |
-
-Der kleine Punkt am Profil-Knopf zeigt den Status:
-🟢 synchronisiert · 🟡 gleicht gerade ab · 🔴 Problem (Details in den Einstellungen)
+| Abgleichen | Profil-Knopf → **Jetzt synchronisieren** |
+| Wer macht mit? | Profil-Knopf → **Im Haushalt** (alle Geräte, die schon synchronisiert haben) |
 
 ---
 
 ## Häufige Fragen
 
 **Kostet das etwas?**
-Nein. GitHub Pages und der Supabase-Free-Plan sind kostenlos.
+Nein. GitHub Pages ist kostenlos, und die Sync-Datei ist winzig (passt locker in die kostenlosen 5 GB iCloud).
 
-**Was, wenn die App eine Woche lang niemand benutzt?**
-Supabase pausiert kostenlose Projekte nach etwa 7 Tagen ohne Nutzung.
-Dann im Supabase-Dashboard das Projekt öffnen und **Resume project** klicken – die Daten bleiben erhalten.
-In der App steht dann „Server nicht erreichbar – ist das Supabase-Projekt pausiert?“.
+**Warum geht der Abgleich nicht automatisch?**
+Safari erlaubt Webseiten aus Sicherheitsgründen nicht, selbstständig Dateien in iCloud zu lesen
+oder zu schreiben. Deshalb tippst du beim Öffnen und Speichern kurz selbst.
+
+**Ich habe aus Versehen „Beide behalten“ statt „Ersetzen“ gewählt.**
+Nicht schlimm. Dann gibt es eine zweite Datei (z. B. „haushaltsplan-sync 2.json“).
+Beim nächsten Mal in Schritt 1 einfach **beide Dateien** auswählen – die App führt alles zusammen.
+Danach die überzählige Datei in der Dateien-App löschen.
+
+**Was passiert, wenn zwei Personen gleichzeitig synchronisieren?**
+Es kann sein, dass dann die Einträge einer Person kurz fehlen. Sie gehen aber nicht verloren:
+Jedes Gerät hat alle eigenen Einträge gespeichert und bringt sie beim nächsten Abgleich wieder mit.
+
+**Was passiert, wenn zwei Personen denselben Eintrag ändern?**
+Die neueste Änderung gewinnt.
 
 **Funktioniert die App ohne Internet?**
-Ja. Alle Daten liegen auf jedem Handy. Ausgaben können offline eingetragen werden,
-der Abgleich passiert automatisch, sobald wieder Internet da ist.
-
-**Was passiert, wenn zwei Personen gleichzeitig etwas ändern?**
-Jede Ausgabe wird einzeln abgeglichen. Ändern zwei Geräte genau denselben Eintrag,
-gewinnt die neueste Änderung.
+Ja. Alle Daten liegen auf jedem Gerät. Nur zum Synchronisieren braucht iCloud kurz Internet.
 
 **Ich habe ein neues Handy.**
-App installieren (Teil C) und mit Code + Passwort beitreten (Teil D). Alle Daten kommen automatisch.
+App installieren (Teil A), Einladung zum Ordner annehmen und synchronisieren (Teil C) – alle Daten sind wieder da.
 
-**In der App steht „Sync nicht eingerichtet“.**
-In `config.js` fehlen noch die Supabase-Werte (Teil B).
-
-**Es steht „Allow anonymous sign-ins ist noch ausgeschaltet“.**
-Teil A, Schritt 3 erledigen.
-
-**Es steht „Die Datenbank ist noch nicht eingerichtet“.**
-Teil A, Schritt 2 erledigen.
-
-**„Zu viele Fehlversuche“?**
-Nach 10 falschen Passwörtern ist der Haushalt 15 Minuten gesperrt (Schutz vor Ausprobieren).
+**„… ist keine Haushaltsplan-Datei“?**
+Es wurde eine falsche Datei ausgewählt. Bitte **haushaltsplan-sync.json** im Ordner **Haushaltsplan** wählen.
 
 **Wie sicher ist das?**
-Alle Inhalte werden auf dem Handy mit dem Haushalts-Passwort verschlüsselt (AES-256).
-Supabase und alle anderen sehen nur Zeichensalat. Zusätzlich sorgen Zugriffsregeln in der
-Datenbank dafür, dass nur Mitglieder des Haushalts überhaupt an die (verschlüsselten) Daten kommen.
-Details: [TECHNIK.md](TECHNIK.md#sicherheit).
+Die Daten liegen nur auf euren Geräten und in eurem geteilten iCloud-Ordner.
+Zugriff haben nur die Personen, mit denen ihr den Ordner geteilt habt (und Apple als Anbieter von iCloud).
+Es gibt keinen weiteren Server.

@@ -2,12 +2,12 @@
 
 /* =========================================================
    app.js – Oberfläche der Haushaltsplan-App
-   Daten: store.js · Verschlüsselung: crypto.js · Server: cloud.js · Abgleich: sync.js
+   Daten: store.js · Abgleich über iCloud Drive: sync.js
 
    - Startbildschirm mit Kategorien (hinzufügen / löschen)
    - Kategorie antippen → Ausgaben darin (hinzufügen / löschen)
    - Kategorie löschen nur nach Eintippen von "Löschen"
-   - Einstellungen: Nutzername, E-Mail, Haushalt (erstellen/beitreten/teilen/verlassen)
+   - Einstellungen: Nutzername, E-Mail, iCloud-Sync, Geräte im Haushalt
    ========================================================= */
 
 // ----- Einstellungen -----
@@ -624,55 +624,38 @@ $('#profileForm').addEventListener('submit', (ev) => {
   store.data.profile.username = username;
   store.data.profile.email = email;
   store.save();
-  sync.soon(); // neuer Name soll auch bei den anderen erscheinen
+  renderMembers();
   updateProfileView();
   if (document.activeElement) document.activeElement.blur();
   flashButton($('#saveProfileBtn'), 'Gespeichert ✓');
 });
 
-// ----- Haushalt & Synchronisieren -----
+// ----- iCloud-Sync: Anzeige -----
 function renderSync() {
-  const hh = cloud.household;
-  const ready = vault.available && cloud.configured;
-  let title;
+  const last = sync.lastSync;
+  const open = sync.unsyncedCount();
+  let dot = 'ok';
   let info = '';
-  let dot = '';
 
-  if (!vault.available) {
-    title = 'Nicht verfügbar';
-    info = 'Die App muss über https geöffnet werden.';
-  } else if (!cloud.configured) {
-    title = 'Sync nicht eingerichtet';
-    info = 'In config.js fehlen noch die Supabase-Daten (siehe Anleitung). Bis dahin bleibt alles auf diesem Gerät.';
-  } else if (!hh) {
-    title = 'Kein Haushalt verbunden';
-    info = 'Erstelle einen Haushalt oder tritt einem bei.';
+  if (!last) {
+    dot = open ? 'syncing' : '';
+    info = 'Tippe auf „Jetzt synchronisieren“, um die Daten mit deiner Familie zu teilen.';
   } else {
-    title = `Haushalt ${hh.code}`;
-    if (sync.status === 'syncing') { info = 'Synchronisiere …'; dot = 'syncing'; }
-    else if (sync.status === 'ok') { info = `Zuletzt synchronisiert: ${timeAgo(store.data.sync.lastSync)}`; dot = 'ok'; }
-    else { info = sync.error; dot = 'warn'; }
+    info = open === 0
+      ? 'Alles ist in iCloud gespeichert.'
+      : `${open} ${open === 1 ? 'Änderung ist' : 'Änderungen sind'} noch nicht in iCloud.`;
+    if (open) dot = 'syncing';
   }
 
-  $('#syncTitle').textContent = title;
+  $('#syncTitle').textContent = last ? `Zuletzt synchronisiert: ${timeAgo(last)}` : 'Noch nie synchronisiert';
   $('#syncInfo').textContent = info;
   $('#syncDot').className = 'sync-dot ' + dot;
   $('#avatarDot').className = 'avatar-dot ' + dot;
-
-  const show = (id, visible) => { $(id).hidden = !visible; };
-  show('#hhCreateBtn', ready && !hh);
-  show('#hhJoinBtn', ready && !hh);
-  show('#syncNowBtn', !!hh);
-  show('#hhShareBtn', !!hh);
-  show('#hhLeaveBtn', !!hh);
-  show('#howHint', ready && !hh);
-  $('#syncNowBtn').disabled = sync.status === 'syncing';
-
   renderMembers();
 }
 
 function renderMembers() {
-  const list = cloud.household ? sync.members : [];
+  const list = sync.devices();
   $('#membersBlock').hidden = list.length === 0;
   memberListEl.innerHTML = '';
   list.forEach((m) => {
@@ -680,8 +663,8 @@ function renderMembers() {
     const li = createRow({
       id: m.deviceId,
       icon: firstLetter(m.name),
-      title: m.name,
-      meta: self ? 'Dieses Gerät' : `Zuletzt aktiv ${timeAgo(m.lastSeen)}`,
+      title: self ? (store.data.profile.username || m.name) : m.name,
+      meta: self ? 'Dieses Gerät' : `Zuletzt synchronisiert ${timeAgo(m.lastSync)}`,
       amount: '',
     });
     if (self) li.classList.add('member-self');
@@ -701,139 +684,81 @@ function setBusy(btn, busy, text = '') {
   }
 }
 
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    let ok = false;
-    try { ok = document.execCommand('copy'); } catch { /* nicht möglich */ }
-    ta.remove();
-    return ok;
-  }
+// ----- iCloud-Sync: Fenster mit 2 Schritten -----
+const syncSheet = $('#syncSheet');
+const syncFileIn = $('#syncFileIn');
+const step1Result = $('#step1Result');
+
+function setStep2Enabled(enabled) {
+  $('#step2').classList.toggle('disabled', !enabled);
+  $('#syncSaveBtn').disabled = !enabled;
 }
 
-// --- Haushalt erstellen ---
-const createSheet = $('#createSheet');
-createSheet.addEventListener('submit', async (ev) => {
-  ev.preventDefault();
-  const pwIn = $('#createPwIn');
-  const pw2In = $('#createPw2In');
-  if (pwIn.value.length < 8) { flagError(pwIn, 'Mindestens 8 Zeichen'); return; }
-  if (pwIn.value !== pw2In.value) { flagError(pw2In, 'Die Passwörter sind nicht gleich'); return; }
-
-  const btn = $('#createSubmit');
-  setBusy(btn, true, 'Wird erstellt …');
-  try {
-    await cloud.createHousehold(pwIn.value);
-    closeSheet();
-    renderSync();
-    sync.run();
-    setTimeout(openShareSheet, 450);
-  } catch (err) {
-    flagError(pw2In, err.message);
-  } finally {
-    setBusy(btn, false);
-  }
-});
-
-// --- Haushalt beitreten ---
-const joinSheet = $('#joinSheet');
-const joinCodeIn = $('#joinCodeIn');
-joinCodeIn.addEventListener('input', () => {
-  joinCodeIn.value = normalizeHouseholdCode(joinCodeIn.value);
-});
-
-joinSheet.addEventListener('submit', async (ev) => {
-  ev.preventDefault();
-  const pwIn = $('#joinPwIn');
-  const code = normalizeHouseholdCode(joinCodeIn.value);
-  let ok = true;
-  if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) { flagError(joinCodeIn, 'Der Code sieht so aus: XXXX-XXXX'); ok = false; }
-  if (!pwIn.value) { flagError(pwIn, 'Bitte das Passwort eingeben'); ok = false; }
-  if (!ok) return;
-
-  const btn = $('#joinSubmit');
-  setBusy(btn, true, 'Prüfe …');
-  try {
-    const result = await cloud.joinHousehold(code, pwIn.value);
-    if (result === 'ok') {
-      closeSheet();
-      renderSync();
-      sync.run();
-      showToast('Willkommen im Haushalt!');
-    } else if (result === 'locked') {
-      flagError(pwIn, 'Zu viele Fehlversuche – bitte 15 Minuten warten');
-    } else {
-      flagError(pwIn, 'Code oder Passwort stimmt nicht');
-    }
-  } catch (err) {
-    flagError(pwIn, err.message);
-  } finally {
-    setBusy(btn, false);
-  }
-});
-
-// --- Code teilen ---
-const shareSheet = $('#shareSheet');
-function openShareSheet() {
-  if (!cloud.household) return;
-  $('#shareCode').textContent = cloud.household.code;
-  $('#shareSendBtn').textContent = navigator.share ? 'Teilen' : 'Kopieren';
-  delete $('#shareSendBtn').dataset.label;
-  openSheet(shareSheet, null);
+function openSyncSheet() {
+  step1Result.hidden = true;
+  step1Result.className = 'step-result';
+  $('#step1').classList.remove('done');
+  setStep2Enabled(false);
+  const method = sync.saveMethod();
+  $('#step2Hint').textContent = method === 'share'
+    ? 'Tippe auf „In Dateien sichern“, wähle denselben iCloud-Ordner und dann „Ersetzen“.'
+    : method === 'picker'
+      ? 'Wähle denselben Ordner und überschreibe die alte Datei.'
+      : 'Die Datei wird heruntergeladen – verschiebe sie danach in den gemeinsamen Ordner.';
+  openSheet(syncSheet, null);
 }
 
-$('#shareSendBtn').addEventListener('click', async (ev) => {
-  const btn = ev.currentTarget;
-  const text = 'Tritt unserem Haushaltsplan bei!\n'
-    + `App: ${location.origin}${location.pathname}\n`
-    + `Haushalts-Code: ${cloud.household.code}\n`
-    + '(Das Passwort sage ich dir persönlich.)';
-  if (navigator.share) {
-    try { await navigator.share({ title: 'Haushaltsplan', text }); } catch { /* abgebrochen */ }
-  } else {
-    flashButton(btn, (await copyText(text)) ? 'Kopiert ✓' : 'Ging nicht');
-  }
+function showStep1Result(text, ok) {
+  step1Result.textContent = text;
+  step1Result.className = 'step-result ' + (ok ? 'ok' : 'bad');
+  step1Result.hidden = false;
+  $('#step1').classList.toggle('done', ok);
+  setStep2Enabled(ok);
+}
+
+$('#syncPickBtn').addEventListener('click', () => {
+  syncFileIn.value = '';
+  syncFileIn.click();
 });
 
-// --- Haushalt verlassen (zweimal tippen) ---
-let leaveTimer = 0;
-$('#hhLeaveBtn').addEventListener('click', async (ev) => {
-  const btn = ev.currentTarget;
-  if (!leaveTimer) {
-    btn.textContent = 'Wirklich verlassen?';
-    btn.classList.add('armed-danger');
-    leaveTimer = setTimeout(() => {
-      leaveTimer = 0;
-      btn.textContent = 'Verlassen';
-      btn.classList.remove('armed-danger');
-    }, 3000);
+syncFileIn.addEventListener('change', async () => {
+  const files = Array.from(syncFileIn.files || []);
+  if (!files.length) return;
+  const result = await sync.importFiles(files);
+  if (!result.filesOk) {
+    showStep1Result(result.errors[0] || 'Datei konnte nicht gelesen werden', false);
     return;
   }
-  clearTimeout(leaveTimer);
-  leaveTimer = 0;
-  btn.classList.remove('armed-danger');
-  btn.dataset.label = 'Verlassen';
+  const n = result.added + result.updated;
+  let text = n === 0
+    ? '✓ Datei gelesen – nichts Neues von den anderen.'
+    : `✓ ${n} ${n === 1 ? 'Eintrag' : 'Einträge'} von den anderen übernommen.`;
+  if (result.errors.length) text += ` (${result.errors.length} Datei(en) übersprungen)`;
+  showStep1Result(text, true);
+});
+
+$('#syncFirstBtn').addEventListener('click', () => {
+  showStep1Result('Okay – im nächsten Schritt wird die Sync-Datei neu angelegt.', true);
+});
+
+$('#syncSaveBtn').addEventListener('click', async (ev) => {
+  const btn = ev.currentTarget;
   setBusy(btn, true, 'Bitte warten …');
   try {
-    await cloud.leaveHousehold();
-    sync.members = [];
-    sync.setStatus('off');
-    showToast('Haushalt verlassen – deine Daten bleiben auf diesem Gerät');
+    const result = await sync.exportFile();
+    if (result === 'saved') {
+      closeSheet();
+      showToast('Synchronisiert ✓');
+    }
   } catch (err) {
-    showToast(err.message);
+    showToast('Speichern ging nicht: ' + (err.message || err));
   } finally {
     setBusy(btn, false);
-    renderSync();
+    if (openSheetEl === syncSheet) setStep2Enabled(true);
   }
 });
 
-// Wenn andere Geräte etwas geändert haben: Anzeige neu aufbauen
+// Wenn fremde Einträge übernommen wurden: Anzeige neu aufbauen
 sync.onRemoteChange = () => {
   renderHome();
   if (currentScreen === 'detail') {
@@ -842,6 +767,7 @@ sync.onRemoteChange = () => {
   }
 };
 sync.onUpdate = renderSync;
+store.onChange = renderSync; // Zähler "noch nicht in iCloud" aktuell halten
 
 // =========================================================
 //  KNÖPFE & TASTEN
@@ -856,10 +782,7 @@ document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('cli
 document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', goHome));
 $('#undoBtn').addEventListener('click', runUndo);
 
-$('#hhCreateBtn').addEventListener('click', () => openSheet(createSheet, $('#createPwIn')));
-$('#hhJoinBtn').addEventListener('click', () => openSheet(joinSheet, joinCodeIn));
-$('#hhShareBtn').addEventListener('click', openShareSheet);
-$('#syncNowBtn').addEventListener('click', () => sync.run());
+$('#syncOpenBtn').addEventListener('click', openSyncSheet);
 
 document.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Escape') return;
@@ -874,7 +797,6 @@ setInterval(() => { if (currentScreen === 'settings') renderSync(); }, 30000);
 //  START
 // =========================================================
 store.load();
-cloud.load();
 if (DEVICE_NS) {
   document.title = `Haushaltsplan – Testgerät ${DEVICE_NS}`;
   $('#homeScreen .label').textContent = `Ausgaben gesamt · Testgerät ${DEVICE_NS}`;
@@ -883,7 +805,6 @@ buildIconChips();
 renderHome();
 updateProfileView();
 renderSync();
-sync.init();
 
 // Offline-Fähigkeit (nur über https oder localhost möglich)
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

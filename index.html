@@ -89,21 +89,17 @@
             <button class="btn primary full" type="submit" id="saveProfileBtn">Speichern</button>
           </form>
 
-          <div class="list-head">Haushalt</div>
+          <div class="list-head">iCloud-Sync</div>
           <div class="card sync-card">
             <div class="sync-row">
               <span class="sync-dot" id="syncDot"></span>
               <div class="sync-text">
-                <strong id="syncTitle">Nicht verbunden</strong>
+                <strong id="syncTitle">Noch nie synchronisiert</strong>
                 <span class="meta" id="syncInfo"></span>
               </div>
             </div>
             <div class="sync-actions">
-              <button class="btn primary" type="button" id="hhCreateBtn">Haushalt erstellen</button>
-              <button class="btn ghost" type="button" id="hhJoinBtn">Beitreten</button>
-              <button class="btn primary" type="button" id="syncNowBtn">Jetzt synchronisieren</button>
-              <button class="btn ghost" type="button" id="hhShareBtn">Code teilen</button>
-              <button class="btn ghost danger-text" type="button" id="hhLeaveBtn">Verlassen</button>
+              <button class="btn primary" type="button" id="syncOpenBtn">Jetzt synchronisieren</button>
             </div>
           </div>
 
@@ -112,10 +108,10 @@
             <ul id="memberList" class="list members"></ul>
           </div>
 
-          <p class="hint how" id="howHint">
-            <b>So geht's:</b> Eine Person erstellt den Haushalt und legt ein Passwort fest.
-            Alle anderen tippen auf „Beitreten“ und geben Code und Passwort ein.
-            Alles wird verschlüsselt und alle 3 Minuten abgeglichen.
+          <p class="hint how">
+            <b>So geht's:</b> Leg in der Dateien-App unter iCloud Drive einen Ordner „Haushaltsplan“ an
+            und teile ihn mit deiner Familie. Beim Synchronisieren öffnest du die Datei
+            „haushaltsplan-sync.json“ aus diesem Ordner und speicherst sie danach dort wieder.
           </p>
         </div>
       </section>
@@ -185,60 +181,34 @@
       </div>
     </form>
 
-    <!-- ===== Fenster: Haushalt erstellen ===== -->
-    <form id="createSheet" class="sheet" autocomplete="off" novalidate inert>
+    <!-- ===== Fenster: Synchronisieren ===== -->
+    <form id="syncSheet" class="sheet" autocomplete="off" inert>
       <div class="grab"></div>
-      <h2>Haushalt erstellen</h2>
-      <p class="confirm-text">Lege ein Passwort für euren Haushalt fest. Damit wird alles verschlüsselt,
-        und nur wer es kennt, kann beitreten. <b>Gut merken</b> – es lässt sich nicht zurücksetzen.</p>
-      <label class="field">
-        <span>Haushalts-Passwort (mind. 8 Zeichen)</span>
-        <input id="createPwIn" type="password" autocomplete="new-password">
-        <small class="err"></small>
-      </label>
-      <label class="field">
-        <span>Passwort wiederholen</span>
-        <input id="createPw2In" type="password" autocomplete="new-password">
-        <small class="err"></small>
-      </label>
-      <div class="actions">
-        <button type="button" class="btn ghost" data-close>Abbrechen</button>
-        <button type="submit" class="btn primary" id="createSubmit">Erstellen</button>
-      </div>
-    </form>
+      <h2>Mit iCloud synchronisieren</h2>
 
-    <!-- ===== Fenster: Haushalt beitreten ===== -->
-    <form id="joinSheet" class="sheet" autocomplete="off" novalidate inert>
-      <div class="grab"></div>
-      <h2>Haushalt beitreten</h2>
-      <p class="confirm-text">Gib den Haushalts-Code und das Passwort ein, das du von deiner Familie bekommen hast.</p>
-      <label class="field">
-        <span>Haushalts-Code</span>
-        <input id="joinCodeIn" class="code-input" type="text" placeholder="XXXX-XXXX" maxlength="9"
-               autocapitalize="characters" spellcheck="false">
-        <small class="err"></small>
-      </label>
-      <label class="field">
-        <span>Haushalts-Passwort</span>
-        <input id="joinPwIn" type="password" autocomplete="current-password">
-        <small class="err"></small>
-      </label>
-      <div class="actions">
-        <button type="button" class="btn ghost" data-close>Abbrechen</button>
-        <button type="submit" class="btn primary" id="joinSubmit">Beitreten</button>
+      <div class="step" id="step1">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <strong>Sync-Datei öffnen</strong>
+          <p>Wähle <b>haushaltsplan-sync.json</b> im gemeinsamen iCloud-Ordner.</p>
+          <button type="button" class="btn primary" id="syncPickBtn">Datei auswählen</button>
+          <button type="button" class="link-btn" id="syncFirstBtn">Es gibt noch keine Datei</button>
+          <p class="step-result" id="step1Result" hidden></p>
+        </div>
       </div>
-    </form>
 
-    <!-- ===== Fenster: Code teilen ===== -->
-    <form id="shareSheet" class="sheet" autocomplete="off" inert>
-      <div class="grab"></div>
-      <h2>Familie einladen</h2>
-      <p class="confirm-text">Gib deiner Familie diesen Code und – am besten mündlich – das Passwort.
-        Sie öffnen die App, gehen in die Einstellungen und tippen auf „Beitreten“.</p>
-      <div class="big-code" id="shareCode">XXXX-XXXX</div>
+      <div class="step disabled" id="step2">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <strong>Zurück in iCloud speichern</strong>
+          <p id="step2Hint">Tippe auf „In Dateien sichern“, wähle denselben Ordner und dann „Ersetzen“.</p>
+          <button type="button" class="btn primary" id="syncSaveBtn" disabled>Speichern</button>
+        </div>
+      </div>
+
+      <input type="file" id="syncFileIn" accept="application/json,.json" multiple hidden>
       <div class="actions">
-        <button type="button" class="btn ghost" data-close>Fertig</button>
-        <button type="button" class="btn primary" id="shareSendBtn">Teilen</button>
+        <button type="button" class="btn ghost" data-close>Schließen</button>
       </div>
     </form>
 
@@ -249,10 +219,7 @@
     </div>
 
   </div>
-  <script src="config.js"></script>
   <script src="js/store.js"></script>
-  <script src="js/crypto.js"></script>
-  <script src="js/cloud.js"></script>
   <script src="js/sync.js"></script>
   <script src="js/app.js"></script>
 </body>

@@ -1,14 +1,15 @@
 # 🧾 Haushaltsplan
 
 Eine einfache, schnelle Web-App, in der die ganze Familie ihre Ausgaben sammelt –
-übersichtlich nach Kategorien, auf allen Handys synchron und Ende-zu-Ende-verschlüsselt.
+übersichtlich nach Kategorien und über einen gemeinsamen **iCloud-Drive-Ordner** abgeglichen.
 
 **👉 App öffnen: https://treneus.github.io/haushaltsplan/**
 
 <p>
-  <img src="docs/bilder/start.png" width="230" alt="Startbildschirm mit Kategorien">
-  <img src="docs/bilder/kategorie.png" width="230" alt="Ausgaben einer Kategorie">
-  <img src="docs/bilder/neue-ausgabe.png" width="230" alt="Neue Ausgabe eintragen">
+  <img src="docs/bilder/start.png" width="200" alt="Startbildschirm mit Kategorien">
+  <img src="docs/bilder/kategorie.png" width="200" alt="Ausgaben einer Kategorie">
+  <img src="docs/bilder/neue-ausgabe.png" width="200" alt="Neue Ausgabe eintragen">
+  <img src="docs/bilder/sync.png" width="200" alt="Mit iCloud synchronisieren">
 </p>
 
 ## Funktionen
@@ -17,36 +18,26 @@ Eine einfache, schnelle Web-App, in der die ganze Familie ihre Ausgaben sammelt 
   (Löschen nur nach Eintippen von „Löschen“)
 - **Ausgaben** mit Betrag, Beschreibung und Datum (vorausgewählt: heute, „Gestern“ per Knopf)
 - **Löschen** per Wischen nach links oder ✕ – mit „Rückgängig“
-- **Haushalt**: Familie verbindet sich mit Code + Passwort, alles wird alle 3 Minuten abgeglichen
-- **Verschlüsselt**: Der Server sieht nur Zeichensalat – das Passwort verlässt nie das Handy
-- **Offline nutzbar**: Jedes Gerät hat alle Daten selbst, der Abgleich wird nachgeholt
+- **iCloud-Sync**: Die Familie teilt einen iCloud-Ordner mit einer Sync-Datei.
+  Abgleichen in zwei Schritten: Datei öffnen → wieder speichern
+- **Jedes Gerät hat alle Daten selbst** – funktioniert auch ohne Internet
 - **Wie eine echte App** auf dem iPhone: „Zum Home-Bildschirm“, Vollbild, eigenes Symbol
-- Kein App Store, keine Installation, keine Kosten
+- Kein App Store, kein Server, keine Anmeldung, keine Kosten
 
-## Auf dem iPhone installieren
+## Schnellstart
 
-1. Link oben in **Safari** öffnen
-2. Unten auf **Teilen** (□↑) tippen → **„Zum Home-Bildschirm“**
-3. Ab jetzt die App über das neue Symbol starten
-   *(wichtig: Daten aus Safari und vom Home-Bildschirm sind auf dem iPhone getrennt –
-   immer das Symbol benutzen)*
+1. App-Link in **Safari** öffnen → **Teilen** → **„Zum Home-Bildschirm“**
+2. In der **Dateien-App** unter iCloud Drive einen Ordner **„Haushaltsplan“** anlegen und mit der Familie teilen
+3. In der App: Profil-Knopf → **Jetzt synchronisieren**
 
-## Einrichtung (einmalig)
-
-Damit sich die Handys abgleichen, braucht die App ein kostenloses Supabase-Projekt.
-Das dauert etwa 10 Minuten und ist Schritt für Schritt hier beschrieben:
-
-📖 **[docs/ANLEITUNG.md](docs/ANLEITUNG.md)** – Einrichtung und Bedienung
-
-Ohne Einrichtung funktioniert die App auch – dann nur auf dem eigenen Gerät.
+📖 Ausführlich: **[docs/ANLEITUNG.md](docs/ANLEITUNG.md)**
 
 ## Dokumentation
 
 | Dokument | Für wen | Inhalt |
 |---|---|---|
-| [docs/ANLEITUNG.md](docs/ANLEITUNG.md) | Alle | Einrichtung, Installation, Bedienung, häufige Fragen |
-| [docs/TECHNIK.md](docs/TECHNIK.md) | Entwickler | Aufbau, Datenmodell, Sync, Verschlüsselung, Sicherheit, Tests |
-| [supabase/setup.sql](supabase/setup.sql) | Einrichtung | Datenbank-Tabellen und Zugriffsregeln |
+| [docs/ANLEITUNG.md](docs/ANLEITUNG.md) | Alle | Einrichtung, iCloud-Ordner teilen, Bedienung, häufige Fragen |
+| [docs/TECHNIK.md](docs/TECHNIK.md) | Entwickler | Aufbau, Datenmodell, Sync-Verfahren, Dateiformat, Sicherheit, Tests |
 
 ## Projektaufbau
 
@@ -54,18 +45,14 @@ Ohne Einrichtung funktioniert die App auch – dann nur auf dem eigenen Gerät.
 haushaltsplan/
 ├── index.html            Oberfläche (alle Bildschirme und Fenster)
 ├── style.css             Aussehen und Animationen
-├── config.js             Supabase-Adresse und -Schlüssel (einmal eintragen)
 ├── manifest.webmanifest  App-Name und Symbol für den Home-Bildschirm
 ├── sw.js                 Service Worker: App startet auch offline
 ├── start.sh              lokal unter Linux starten
 ├── icons/                App-Symbole
 ├── js/
 │   ├── store.js          Datenspeicher auf dem Gerät + Zusammenführen
-│   ├── crypto.js         Verschlüsselung mit dem Haushalts-Passwort
-│   ├── cloud.js          Verbindung zu Supabase
-│   ├── sync.js           automatischer Abgleich
+│   ├── sync.js           Abgleich über die Sync-Datei in iCloud Drive
 │   └── app.js            Bildschirme, Knöpfe, Listen
-├── supabase/setup.sql    Datenbank-Einrichtung
 └── docs/                 Anleitung, Technik-Doku, Bilder
 ```
 

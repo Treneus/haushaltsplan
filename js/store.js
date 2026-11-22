@@ -26,7 +26,7 @@ const makeId = () => Date.now().toString(36) + Math.random().toString(36).slice(
 
 const store = {
   data: null,     // { deviceId, profile, records: { id: record }, sync: {...} }
-  onChange: null, // wird von sync.js gesetzt: "es gibt etwas Neues zum Hochladen"
+  onChange: null, // wird von app.js gesetzt: z. B. Anzeige "noch nicht synchronisiert" aktualisieren
 
   // ----- Laden & Speichern -----
   load() {
@@ -35,9 +35,11 @@ const store = {
     if (!d || typeof d.records !== 'object' || !d.deviceId) d = this.fresh();
     d.profile = d.profile || { username: '', email: '' };
     d.sync = d.sync || {};
-    d.sync.remoteVer = d.sync.remoteVer || {}; // id → updatedAt, das auf dem Server liegt
-    d.sync.pullMs = d.sync.pullMs || 0;        // bis zu welcher Server-Zeit schon abgeholt
-    delete d.sync.seenFiles;                   // Rest aus der Ordner-Sync-Version
+    d.sync.exportedAt = d.sync.exportedAt || 0; // wann zuletzt in die Sync-Datei gespeichert
+    d.sync.devices = d.sync.devices || {};      // Geräte aus der Sync-Datei: id → { name, lastSync }
+    delete d.sync.remoteVer;                    // Reste älterer Sync-Versionen
+    delete d.sync.pullMs;
+    delete d.sync.seenFiles;
     this.data = d;
     this.save();
   },
@@ -159,13 +161,6 @@ const store = {
   restore(id) {
     const r = this.get(id);
     if (r) this.put({ ...r, deleted: false });
-  },
-
-  // Beim Wechsel des Haushalts: alles gilt wieder als "noch nicht hochgeladen"
-  resetSyncState() {
-    this.data.sync.remoteVer = {};
-    this.data.sync.pullMs = 0;
-    this.save();
   },
 
   // Kategorie UND alle Ausgaben darin als gelöscht markieren

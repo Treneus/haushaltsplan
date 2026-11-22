@@ -3,19 +3,16 @@
 
    Strategie "Netz zuerst": Ist Internet da, wird immer die neueste
    Version geladen (und gespeichert). Ohne Internet kommt die
-   gespeicherte Version. Anfragen an Supabase werden nie gespeichert.
+   gespeicherte Version.
    Bei größeren Änderungen CACHE_NAME hochzählen.
    ========================================================= */
-const CACHE_NAME = 'haushaltsplan-v1';
+const CACHE_NAME = 'haushaltsplan-v2';
 const APP_FILES = [
   './',
   './index.html',
   './style.css',
-  './config.js',
   './manifest.webmanifest',
   './js/store.js',
-  './js/crypto.js',
-  './js/cloud.js',
   './js/sync.js',
   './js/app.js',
   './icons/icon-192.png',

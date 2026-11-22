@@ -1,133 +1,158 @@
 'use strict';
 
 /* =========================================================
-   sync.js – Abgleich mit dem Haushalt (über Supabase)
+   sync.js – Abgleich über eine gemeinsame Datei in iCloud Drive
 
-   Jedes Gerät hat ALLE Daten selbst. Bei jedem Abgleich:
-     1. Änderungen der anderen holen, entschlüsseln, zusammenführen
-     2. eigene neuere Einträge verschlüsseln und hochladen
-     3. "Ich bin da" melden und Geräteliste holen
-   Wann: alle 3 Minuten, 2 s nach einer Änderung, beim Öffnen der App
-   und wenn das Internet zurückkommt.
+   Jedes Gerät hat ALLE Daten selbst gespeichert. Die Familie teilt
+   sich einen iCloud-Ordner, darin liegt die Datei
+   "haushaltsplan-sync.json" mit allen Einträgen.
+
+   Synchronisieren = 2 Schritte (Safari darf Dateien nicht selbst
+   lesen/schreiben, deshalb tippt man kurz mit):
+     1. Datei öffnen → fremde Einträge übernehmen (neueste gewinnt)
+     2. Zusammengeführte Datei zurück in den Ordner speichern
+
+   Geht dabei mal etwas verloren (z. B. zwei Personen speichern
+   gleichzeitig), ist das nicht schlimm: Jedes Gerät hat seine
+   Einträge noch und bringt sie beim nächsten Abgleich wieder mit.
    ========================================================= */
 
-const SYNC_EVERY_MS = 3 * 60 * 1000;
-const SYNC_AFTER_CHANGE_MS = 2000;
-const PULL_OVERLAP_MS = 10000; // etwas Überlappung, damit nichts verloren geht
+const SYNC_FILE_NAME = 'haushaltsplan-sync.json';
+const SYNC_FORMAT = 'haushaltsplan-sync';
+const SYNC_VERSION = 1;
 
 const sync = {
-  status: 'off',   // off | syncing | ok | offline | error
-  error: '',
-  members: [],
-  running: false,
-  again: false,
-  timer: 0,
-  onUpdate: () => {},
-  onRemoteChange: () => {},
+  onUpdate: () => {},        // Status hat sich geändert
+  onRemoteChange: () => {},  // fremde Einträge wurden übernommen
 
-  get active() {
-    return cloud.configured && !!cloud.household;
+  get lastSync() {
+    return store.data.sync.lastSync || 0;
   },
 
-  setStatus(status, error = '') {
-    this.status = status;
-    this.error = error;
-    this.onUpdate();
+  // Wie viele eigene Änderungen sind noch nicht in der Sync-Datei?
+  unsyncedCount() {
+    const since = store.data.sync.exportedAt || 0;
+    return Object.values(store.data.records)
+      .filter((r) => r.device === store.data.deviceId && r.updatedAt > since).length;
   },
 
-  init() {
-    store.onChange = () => this.soon();
-    setInterval(() => this.run(), SYNC_EVERY_MS);
-    window.addEventListener('focus', () => this.run());
-    window.addEventListener('online', () => this.run());
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) this.run(); });
-    this.setStatus(this.active ? 'ok' : 'off');
-    this.run();
+  // Alle Geräte, die schon einmal synchronisiert haben (neueste zuerst)
+  devices() {
+    return Object.entries(store.data.sync.devices || {})
+      .map(([deviceId, d]) => ({ deviceId, name: d.name, lastSync: d.lastSync }))
+      .sort((a, b) => b.lastSync - a.lastSync);
   },
 
-  soon() {
-    clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.run(), SYNC_AFTER_CHANGE_MS);
-  },
+  // ----- Schritt 1: Datei(en) einlesen und zusammenführen -----
+  async importFiles(files) {
+    const result = { filesOk: 0, added: 0, updated: 0, errors: [] };
 
-  async run() {
-    if (!this.active) return;
-    if (this.running) { this.again = true; return; }
-    this.running = true;
-    this.setStatus('syncing');
-    try {
-      if (!vault.key) await vault.load(cloud.household.keyB64);
-      await cloud.ensureSession();
-      if (cloud.needsRejoin) await cloud.rejoin();
-      const changed = await this.syncOnce();
-      this.setStatus('ok');
-      if (changed) this.onRemoteChange();
-    } catch (err) {
-      console.warn('Sync:', err);
-      if (err.code === 'offline') {
-        this.setStatus('offline', 'Offline – wird automatisch nachgeholt');
-      } else {
-        if (err.status === 401 || err.status === 403 || err.code === '42501') cloud.needsRejoin = true;
-        this.setStatus('error', err.message || 'Unbekannter Fehler');
-      }
-    } finally {
-      this.running = false;
-      if (this.again) { this.again = false; this.run(); }
-    }
-  },
-
-  async syncOnce() {
-    const s = store.data.sync;
-    let changed = false;
-
-    // 1. Änderungen holen
-    const rows = await cloud.pull(Math.max(0, s.pullMs - PULL_OVERLAP_MS));
-    for (const row of rows) {
-      s.pullMs = Math.max(s.pullMs, Number(row.server_ms) || 0);
-      s.remoteVer[row.id] = Math.max(s.remoteVer[row.id] ?? -1, Number(row.updated_at));
-      let rec;
+    for (const file of files) {
+      let data;
       try {
-        rec = await vault.decrypt(row.payload, cloud.recordAad(row.id));
+        data = JSON.parse(await file.text());
       } catch {
-        continue; // nicht entschlüsselbar → überspringen
+        result.errors.push(`„${file.name}“ ist keine gültige Sync-Datei`);
+        continue;
       }
-      if (!store.isValid(rec) || rec.id !== row.id) continue;
-      if (store.merge(rec)) changed = true;
+      if (!data || data.format !== SYNC_FORMAT || !Array.isArray(data.records)) {
+        result.errors.push(`„${file.name}“ ist keine Haushaltsplan-Datei`);
+        continue;
+      }
+      if (data.version > SYNC_VERSION) {
+        result.errors.push(`„${file.name}“ stammt von einer neueren App-Version – bitte App neu laden`);
+        continue;
+      }
+
+      result.filesOk++;
+      for (const rec of data.records) {
+        if (!store.isValid(rec)) continue;
+        const existed = !!store.get(rec.id);
+        if (store.merge(rec)) {
+          if (existed) result.updated++;
+          else result.added++;
+        }
+      }
+      this.mergeDevices(data.devices);
     }
 
-    // 2. Eigene neuere Einträge hochladen
-    const out = [];
-    for (const rec of Object.values(store.data.records)) {
-      if (rec.updatedAt <= (s.remoteVer[rec.id] ?? -1)) continue;
-      out.push({
-        household_id: cloud.household.id,
-        id: rec.id,
-        updated_at: rec.updatedAt,
-        payload: await vault.encrypt(rec, cloud.recordAad(rec.id)),
-      });
-    }
-    if (out.length) {
-      await cloud.push(out);
-      out.forEach((r) => { s.remoteVer[r.id] = Math.max(s.remoteVer[r.id] ?? -1, r.updated_at); });
-    }
-
-    // 3. Geräte
-    await cloud.heartbeat();
-    const list = [];
-    for (const m of await cloud.members()) {
-      try {
-        const p = await vault.decrypt(m.payload, cloud.memberAad(cloud.household.code, m.device_id));
-        list.push({
-          deviceId: m.device_id,
-          name: String(p.name || 'Ohne Namen'),
-          lastSeen: Date.parse(String(m.last_seen).replace(/(\.\d{3})\d+/, '$1')) || 0,
-        });
-      } catch { /* überspringen */ }
-    }
-    this.members = list.sort((a, b) => b.lastSeen - a.lastSeen);
-
-    s.lastSync = Date.now();
     store.save();
-    return changed;
+    if (result.added || result.updated) this.onRemoteChange();
+    this.onUpdate();
+    return result;
+  },
+
+  mergeDevices(devices) {
+    if (!devices || typeof devices !== 'object') return;
+    const own = store.data.sync.devices;
+    for (const [id, d] of Object.entries(devices)) {
+      if (!/^[A-Za-z0-9_-]{1,40}$/.test(id) || !d || typeof d.name !== 'string' || typeof d.lastSync !== 'number') continue;
+      if (!own[id] || d.lastSync > own[id].lastSync) own[id] = { name: d.name.slice(0, 40), lastSync: d.lastSync };
+    }
+  },
+
+  // ----- Schritt 2: zusammengeführte Datei speichern -----
+  buildFile() {
+    const now = Date.now();
+    const s = store.data.sync;
+    s.devices[store.data.deviceId] = { name: store.data.profile.username || 'Ohne Namen', lastSync: now };
+    const data = {
+      format: SYNC_FORMAT,
+      version: SYNC_VERSION,
+      savedAt: now,
+      savedBy: store.data.deviceId,
+      devices: s.devices,
+      records: Object.values(store.data.records),
+    };
+    return new File([JSON.stringify(data)], SYNC_FILE_NAME, { type: 'application/json' });
+  },
+
+  // Welche Speicher-Art gibt es auf diesem Gerät?
+  //  'share' – iPhone/iPad: Teilen-Menü → "In Dateien sichern"
+  //  'picker' – Chrome am Computer: "Speichern unter"-Fenster
+  //  'download' – sonst: normaler Download
+  saveMethod() {
+    try {
+      const probe = new File(['{}'], SYNC_FILE_NAME, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [probe] })) return 'share';
+    } catch { /* weiter */ }
+    if (window.showSaveFilePicker) return 'picker';
+    return 'download';
+  },
+
+  // Rückgabe: 'saved' | 'cancelled'
+  async exportFile() {
+    const file = this.buildFile();
+    const method = this.saveMethod();
+    try {
+      if (method === 'share') {
+        await navigator.share({ files: [file], title: 'Haushaltsplan-Sync' });
+      } else if (method === 'picker') {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: SYNC_FILE_NAME,
+          types: [{ description: 'Haushaltsplan-Sync', accept: { 'application/json': ['.json'] } }],
+        });
+        const writer = await handle.createWritable();
+        await writer.write(file);
+        await writer.close();
+      } else {
+        const url = URL.createObjectURL(file);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = SYNC_FILE_NAME;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      }
+    } catch (err) {
+      if (err && err.name === 'AbortError') return 'cancelled';
+      throw err;
+    }
+    store.data.sync.exportedAt = Date.now();
+    store.data.sync.lastSync = store.data.sync.exportedAt;
+    store.save();
+    this.onUpdate();
+    return 'saved';
   },
 };

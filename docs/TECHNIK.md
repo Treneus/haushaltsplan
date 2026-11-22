@@ -1,7 +1,7 @@
 # Technische Dokumentation
 
-Softwaredokumentation der Haushaltsplan-App: Aufbau, Datenmodell, Synchronisation,
-Verschlüsselung, Sicherheitsmodell, Entwicklung und Tests.
+Softwaredokumentation der Haushaltsplan-App: Aufbau, Datenmodell, Synchronisation über
+iCloud Drive, Dateiformat, Sicherheit, Entwicklung und Tests.
 
 ## Inhalt
 
@@ -9,14 +9,14 @@ Verschlüsselung, Sicherheitsmodell, Entwicklung und Tests.
 2. [Architektur](#architektur)
 3. [Module](#module)
 4. [Datenmodell](#datenmodell)
-5. [Synchronisation](#synchronisation)
-6. [Verschlüsselung](#verschlüsselung)
-7. [Server (Supabase)](#server-supabase)
-8. [Sicherheit](#sicherheit)
-9. [Offline & Installation (PWA)](#offline--installation-pwa)
-10. [Entwicklung](#entwicklung)
-11. [Tests](#tests)
-12. [Bekannte Grenzen & Ideen](#bekannte-grenzen--ideen)
+5. [Synchronisation über iCloud Drive](#synchronisation-über-icloud-drive)
+6. [Dateiformat der Sync-Datei](#dateiformat-der-sync-datei)
+7. [Sicherheit & Datenschutz](#sicherheit--datenschutz)
+8. [Offline & Installation (PWA)](#offline--installation-pwa)
+9. [Entwicklung](#entwicklung)
+10. [Tests](#tests)
+11. [Bekannte Grenzen & Ideen](#bekannte-grenzen--ideen)
+12. [Versionsgeschichte](#versionsgeschichte)
 
 ---
 
@@ -28,40 +28,47 @@ Verschlüsselung, Sicherheitsmodell, Entwicklung und Tests.
 | Hosting | GitHub Pages (statisch, kostenlos) |
 | Abhängigkeiten | keine – kein Framework, keine Bibliotheken, kein Build-Schritt |
 | Datenhaltung | **Local-first**: jedes Gerät speichert alle Daten in `localStorage` |
-| Abgleich | Supabase (Postgres + REST), alle 3 Minuten und nach Änderungen |
+| Abgleich | eine gemeinsame JSON-Datei in einem geteilten iCloud-Drive-Ordner, manuell in 2 Schritten |
 | Konflikte | „Neueste Änderung gewinnt“ pro Eintrag (Last-Writer-Wins) |
-| Verschlüsselung | Ende-zu-Ende, AES-256-GCM, Schlüssel aus Haushalts-Passwort (PBKDF2) |
-| Anmeldung | anonym (Supabase Anonymous Sign-ins), Haushaltszugang über Code + Passwort |
+| Server | keiner – nur GitHub Pages für die App-Dateien |
 
 ## Architektur
 
 ```
-┌──────────────────────────── Handy (Browser) ────────────────────────────┐
-│                                                                         │
-│   index.html + style.css                                                │
-│        │                                                                │
-│   app.js  ── Oberfläche: Bildschirme, Listen, Fenster, Animationen      │
-│        │                                                                │
-│   store.js ── lokale Daten (localStorage), Zusammenführen (merge)       │
-│        │                                                                │
-│   sync.js  ── Abgleich: holen → zusammenführen → hochladen              │
-│        │              │                                                 │
-│   crypto.js           cloud.js ── HTTP zu Supabase (fetch)              │
-│   (AES-GCM, PBKDF2)        │                                            │
-└────────────────────────────┼────────────────────────────────────────────┘
-                             │ HTTPS, nur verschlüsselte Inhalte
-                ┌────────────▼─────────────┐
-                │ Supabase                 │
-                │  Auth (anonym)           │
-                │  PostgREST + RPC         │
-                │  Postgres mit RLS        │
-                └──────────────────────────┘
+┌──────────────────── iPhone (Safari / Home-Bildschirm-App) ────────────────────┐
+│                                                                                │
+│  index.html + style.css                                                        │
+│       │                                                                        │
+│  app.js ── Oberfläche: Bildschirme, Listen, Fenster, Animationen               │
+│       │                                                                        │
+│  store.js ── lokale Daten (localStorage), Zusammenführen (merge)               │
+│       │                                                                        │
+│  sync.js ── Sync-Datei lesen (Dateiauswahl) / schreiben (Teilen-Menü)          │
+│       │                                                                        │
+└───────┼────────────────────────────────────────────────────────────────────────┘
+        │  <input type="file">           navigator.share({ files })
+        ▼                                  → „In Dateien sichern“
+┌──────────────────────────── iCloud Drive ─────────────────────────────┐
+│  Geteilter Ordner „Haushaltsplan“ / haushaltsplan-sync.json           │
+│  (iCloud gleicht den Ordner zwischen den Apple-Accounts der Familie ab)│
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 Die Skripte werden als klassische `<script>`-Dateien in fester Reihenfolge geladen
-(`config.js`, `store.js`, `crypto.js`, `cloud.js`, `sync.js`, `app.js`) und teilen sich
-globale Objekte (`store`, `vault`, `cloud`, `sync`). Auf ES-Module wurde bewusst verzichtet,
-damit die App auch direkt per Doppelklick ohne Server startet (dann ohne Sync).
+(`store.js`, `sync.js`, `app.js`) und teilen sich globale Objekte (`store`, `sync`).
+Auf ES-Module wurde bewusst verzichtet, damit die App auch per Doppelklick ohne Server startet.
+
+### Warum iCloud und warum zwei Schritte?
+
+Safari (auch als Home-Bildschirm-App) erlaubt Webseiten **keinen dauerhaften Zugriff auf Ordner**
+(die File System Access API gibt es dort nicht). Eine Web-App kann aber:
+
+- eine Datei lesen, die der Nutzer **auswählt** (`<input type="file">`), und
+- eine Datei über das **Teilen-Menü** weitergeben (`navigator.share` mit Dateien),
+  wo „In Dateien sichern“ sie in einen iCloud-Ordner speichert.
+
+Daraus ergibt sich der Abgleich in zwei Schritten. iCloud selbst übernimmt das Verteilen der
+Datei auf die Geräte der Familie. Ein eigener Server ist nicht nötig.
 
 ## Module
 
@@ -71,36 +78,30 @@ damit die App auch direkt per Doppelklick ohne Server startet (dann ohne Sync).
 - Jede Kategorie und jede Ausgabe ist ein **Record** (siehe [Datenmodell](#datenmodell)).
 - `put()` setzt automatisch `updatedAt` (streng steigend) und `device`.
 - Löschen setzt nur `deleted: true` („Tombstone“), damit Löschungen synchronisiert werden.
-- `merge(remote)` übernimmt einen fremden Record, wenn er neuer ist.
+- `isValid(rec)` prüft alles, was von außen kommt; `merge(rec)` übernimmt neuere Stände.
 - Übernimmt beim ersten Start Daten älterer Testversionen (`importOld`).
 - `?geraet=2` in der Adresse trennt die Daten (zum Testen mehrerer „Geräte“ in einem Browser).
 
-### `js/crypto.js` – Verschlüsselung (`vault`)
-- `derive(passwort, code)` → AES-Schlüssel + Beitritts-Token
-- `encrypt(obj, aad)` / `decrypt(payload, aad)` mit AES-256-GCM
-- Details: [Verschlüsselung](#verschlüsselung)
-
-### `js/cloud.js` – Supabase-Anbindung (`cloud`)
-- Reine `fetch()`-Aufrufe gegen die Supabase-REST-Schnittstellen, keine Bibliothek.
-- Anonyme Anmeldung, Token-Erneuerung, automatisches Neu-Beitreten bei verlorener Anmeldung.
-- `createHousehold`, `joinHousehold`, `leaveHousehold`, `pull`, `push`, `heartbeat`, `members`.
-- Übersetzt technische Fehlermeldungen in verständliche Texte (`friendlyError`).
-- Speichert Sitzung und Haushaltsdaten unter `haushaltsplan.cloud.v1`.
-
 ### `js/sync.js` – Abgleich (`sync`)
-- Steuert, **wann** synchronisiert wird, und führt den Abgleich aus.
-- Status: `off` · `syncing` · `ok` · `offline` · `error` (wird in der Oberfläche angezeigt).
+- `importFiles(files)` – liest eine oder mehrere Sync-Dateien, prüft Format und Version,
+  führt alle Records und die Geräteliste zusammen. Gibt eine Zusammenfassung zurück.
+- `exportFile()` – baut die Sync-Datei aus allen lokalen Records und speichert sie über
+  `saveMethod()`:
+  - `share` (iPhone/iPad): `navigator.share({ files })` → „In Dateien sichern“
+  - `picker` (Chrome am Computer): `showSaveFilePicker()`
+  - `download` (sonst): normaler Download
+- `unsyncedCount()` – Anzahl eigener Änderungen seit dem letzten Speichern (für den Statuspunkt).
+- `devices()` – Geräte, die schon einmal in die Datei gespeichert haben.
 
 ### `js/app.js` – Oberfläche
 - Drei Bildschirme (Start, Kategorie, Einstellungen) mit Wisch-Animation.
-- Fenster von unten („Sheets“) für alle Eingaben.
+- Fenster von unten („Sheets“) für alle Eingaben, inkl. Sync-Fenster mit 2 Schritten.
 - Listeneinträge mit Wischen-zum-Löschen, Ein-/Ausblend-Animationen, zählende Summen.
 - Eingaben werden geprüft; Fehler erscheinen rot direkt am Feld.
-- Alle Texte aus Nutzereingaben werden mit `textContent` gesetzt (kein HTML-Einschleusen möglich).
+- Alle Texte aus Nutzereingaben und Dateien werden mit `textContent` gesetzt (kein HTML-Einschleusen).
 
 ### `sw.js` – Service Worker
 - „Netz zuerst, sonst Zwischenspeicher“ für alle App-Dateien (3 s Zeitlimit).
-- Supabase-Anfragen werden nie zwischengespeichert.
 
 ## Datenmodell
 
@@ -108,10 +109,14 @@ damit die App auch direkt per Doppelklick ohne Server startet (dann ohne Sync).
 
 ```js
 {
-  deviceId: "mwkyuu81z1eg3a",            // zufällig, einmal pro Gerät
+  deviceId: "mwkyuu81z1eg3a",              // zufällig, einmal pro Gerät
   profile:  { username, email },
   records:  { [id]: Record },
-  sync:     { remoteVer: { [id]: updatedAt }, pullMs, lastSync }
+  sync: {
+    lastSync:   1763800000000,             // letzter vollständiger Abgleich (ms)
+    exportedAt: 1763800000000,             // wann zuletzt in die Sync-Datei gespeichert
+    devices:    { [deviceId]: { name, lastSync } }
+  }
 }
 ```
 
@@ -130,119 +135,73 @@ damit die App auch direkt per Doppelklick ohne Server startet (dann ohne Sync).
 - Die drei Standard-Kategorien haben feste IDs und `updatedAt: 0`, damit neue Geräte
   keine doppelten Kategorien erzeugen und jede echte Änderung gewinnt.
 
-## Synchronisation
+## Synchronisation über iCloud Drive
 
-**Wann:** alle 3 Minuten · 2 s nach einer Änderung (gebündelt) · beim Öffnen/Fokus der App ·
-wenn das Internet zurückkommt · per Knopf.
+**Ablauf (Sync-Fenster in den Einstellungen):**
 
-**Ablauf eines Abgleichs (`sync.syncOnce`):**
+1. **Datei öffnen** – Nutzer wählt `haushaltsplan-sync.json` (oder mehrere Dateien).
+   Jeder gültige Record wird mit `store.merge` übernommen, wenn er neuer ist.
+   Beim allerersten Mal: „Es gibt noch keine Datei“ überspringt diesen Schritt.
+2. **Speichern** – Die App erzeugt eine neue Datei mit **allen** lokalen Records
+   (inkl. der eben übernommenen) und gibt sie ans Teilen-Menü; der Nutzer wählt
+   „In Dateien sichern“ → denselben Ordner → „Ersetzen“.
 
-1. **Holen:** alle Server-Zeilen mit `server_ms > pullMs − 10 s` (Überlappung gegen
-   Lücken), seitenweise à 500. Jede Zeile wird entschlüsselt, geprüft (`store.isValid`)
-   und mit `store.merge` übernommen, wenn sie neuer ist. `remoteVer[id]` merkt sich,
-   welcher Stand auf dem Server liegt.
-2. **Hochladen:** alle lokalen Records mit `updatedAt > remoteVer[id]` werden verschlüsselt
-   und per Upsert in Blöcken à 200 hochgeladen.
-3. **Geräte:** `heartbeat` aktualisiert den eigenen (verschlüsselten) Namen und
-   `last_seen`, danach wird die Geräteliste geholt und entschlüsselt.
+Schritt 2 ist erst nach Schritt 1 möglich. So wird nie eine Datei gespeichert, ohne vorher
+die Änderungen der anderen übernommen zu haben.
 
 **Konfliktlösung:** Last-Writer-Wins pro Record anhand `updatedAt`, bei Gleichstand
-entscheidet die Geräte-ID. Der Server erzwingt dasselbe: Ein Trigger verhindert, dass eine
-ältere Version eine neuere überschreibt. Da jede Ausgabe ein eigener Record ist,
-treten echte Konflikte praktisch nur auf, wenn zwei Personen *denselben* Eintrag ändern.
+entscheidet die Geräte-ID. Da jede Ausgabe ein eigener Record ist, treten echte Konflikte
+praktisch nur auf, wenn zwei Personen *denselben* Eintrag ändern.
 
-**Warum `server_ms` statt Geräte-Uhrzeit zum Holen?** Handy-Uhren können falsch gehen.
-`server_ms` setzt der Server selbst (Trigger), daher ist „alles seit dem letzten Holen“
-zuverlässig.
+**Gleichzeitiges Synchronisieren:** Lesen A und B dieselbe Datei und speichern beide,
+fehlen in der Datei kurzzeitig die Änderungen des zuerst Speichernden. Da jedes Gerät
+**alle eigenen Records behält** und bei jedem Speichern komplett in die Datei schreibt,
+kommen sie beim nächsten Abgleich dieses Geräts automatisch zurück (eventual consistency).
 
-## Verschlüsselung
+**„Beide behalten“ statt „Ersetzen“:** Die Dateiauswahl erlaubt mehrere Dateien
+(`multiple`), alle werden zusammengeführt. Doppelte Dateien schaden daher nicht.
 
+**Statuspunkt:** `unsyncedCount()` zählt eigene Records mit `updatedAt > exportedAt`.
+🟢 = 0 offene Änderungen, 🟡 = offene Änderungen, kein Punkt = noch nie synchronisiert.
+
+## Dateiformat der Sync-Datei
+
+`haushaltsplan-sync.json`:
+
+```json
+{
+  "format": "haushaltsplan-sync",
+  "version": 1,
+  "savedAt": 1763800000000,
+  "savedBy": "mwkyuu81z1eg3a",
+  "devices": {
+    "mwkyuu81z1eg3a": { "name": "Oskar", "lastSync": 1763800000000 }
+  },
+  "records": [
+    { "id": "essen", "type": "section", "name": "Essen/Trinken", "icon": "🍔",
+      "createdAt": 1, "updatedAt": 0, "deleted": false, "device": "" },
+    { "id": "mwl0a1b2c3", "type": "expense", "sectionId": "essen", "title": "Pizza",
+      "cents": 1250, "date": "2026-11-22T18:02:00.000Z", "timeKnown": true,
+      "updatedAt": 1763834520000, "deleted": false, "device": "mwkyuu81z1eg3a" }
+  ]
+}
 ```
-Passwort + Haushalts-Code
-        │  PBKDF2-SHA256, 310.000 Runden, Salt = "haushaltsplan:v1:<CODE>"
-        ▼
-   512 Bit ──┬── Bit 0–255   → AES-256-GCM-Schlüssel   (bleibt auf dem Gerät)
-             └── Bit 256–511 → Beitritts-Token (hex)   (beweist Kenntnis des Passworts)
-```
 
-- **Inhalte:** Jeder Record wird komplett (inkl. Betrag, Text, Datum, Kategorie) als JSON
-  mit AES-256-GCM verschlüsselt. Format: `v1.<IV base64>.<Chiffretext base64>`,
-  zufälliger 96-Bit-IV pro Verschlüsselung.
-- **AAD** (zusätzlich authentifizierte Daten): `<CODE>:<record-id>` bzw.
-  `<CODE>:member:<geräte-id>`. Damit kann niemand verschlüsselte Einträge unbemerkt
-  vertauschen oder in einen anderen Haushalt kopieren.
-- **Beitritt:** Der Server speichert nur `SHA-256(Beitritts-Token)`. Beim Beitreten sendet das
-  Gerät das Token, der Server vergleicht den Hash. Aus dem Token lässt sich der AES-Schlüssel
-  nicht berechnen (getrennte Bits derselben Ableitung).
-- **Klartext auf dem Server:** nur IDs, Zeitstempel, Haushalts-Code und Größe der Einträge.
-- **Auf dem Gerät** liegen AES-Schlüssel und Token in `localStorage`, damit man das Passwort
-  nicht bei jedem Start eingeben muss. Die Daten selbst liegen dort ohnehin im Klartext.
-- Verwendet ausschließlich die eingebaute **Web Crypto API** (benötigt https oder localhost).
+- Dateien mit anderem `format` werden abgelehnt („keine Haushaltsplan-Datei“).
+- Dateien mit höherer `version` werden abgelehnt („neuere App-Version – bitte App neu laden“).
+- Ungültige einzelne Records werden übersprungen (`store.isValid`).
+- Größe: etwa 200 Byte pro Ausgabe – 10.000 Ausgaben ≈ 2 MB.
 
-## Server (Supabase)
+## Sicherheit & Datenschutz
 
-Einrichtung: [`supabase/setup.sql`](../supabase/setup.sql) (idempotent, beliebig oft ausführbar).
-
-### Tabellen
-
-| Tabelle | Zweck | Wichtige Spalten |
-|---|---|---|
-| `households` | ein Haushalt | `id`, `code` (unique), `join_hash`, `failed_joins`, `locked_until` |
-| `members` | Geräte im Haushalt | `household_id`, `device_id`, `user_id` (anonymer Nutzer), `payload` (verschl. Name), `last_seen` |
-| `records` | alle Einträge | `household_id`, `id`, `updated_at`, `payload` (verschlüsselt), `server_ms` |
-
-### Funktionen (RPC, `security definer`)
-
-| Funktion | Zweck |
-|---|---|
-| `create_household(code, join_hash, device_id, payload)` | Haushalt anlegen, Ersteller wird Mitglied |
-| `join_household(code, join_token, device_id, payload)` | Token prüfen → Mitglied werden. Antwort `ok` / `wrong` / `locked` |
-| `heartbeat(household, device_id, payload)` | eigenen Namen + `last_seen` aktualisieren |
-| `is_member(household)` | Hilfsfunktion für die Zugriffsregeln |
-
-### Trigger
-`records_before_write`: setzt `server_ms` und verwirft Updates mit älterem `updated_at`.
-
-### REST-Aufrufe der App
-
-| Zweck | Aufruf |
-|---|---|
-| Anmelden (anonym) | `POST /auth/v1/signup` mit `{ "data": {} }` |
-| Token erneuern | `POST /auth/v1/token?grant_type=refresh_token` |
-| Holen | `GET /rest/v1/records?household_id=eq.…&server_ms=gt.…&order=server_ms.asc,id.asc&limit=500&offset=…` |
-| Hochladen | `POST /rest/v1/records` mit `Prefer: resolution=merge-duplicates` |
-| Geräte | `GET /rest/v1/members?household_id=eq.…` |
-| Verlassen | `DELETE /rest/v1/members?household_id=eq.…&device_id=eq.…` |
-| Funktionen | `POST /rest/v1/rpc/<name>` |
-
-Header: `apikey: <publishable key>` und `Authorization: Bearer <Nutzer-JWT>`.
-Der Publishable Key wird **nie** als Bearer-Token gesendet.
-
-## Sicherheit
-
-Mehrere unabhängige Schutzschichten:
-
-1. **Ende-zu-Ende-Verschlüsselung** – selbst bei vollständigem Datenbank-Zugriff (z. B.
-   durch eine Fehlkonfiguration oder den Anbieter) sind Beträge, Texte und Namen nicht lesbar.
-2. **Row Level Security** auf allen Tabellen – ein angemeldetes Gerät sieht nur Zeilen
-   der Haushalte, in denen es Mitglied ist. Neue Mitglieder nur über `join_household`.
-3. **Minimale Rechte** – die Rolle `anon` hat auf nichts Zugriff; `authenticated` darf
-   `records` nur lesen/einfügen/ändern (kein Löschen), `members` nur lesen und den
-   *eigenen* Eintrag löschen, `households` nur lesen.
-4. **Schutz vor Passwort-Raten** – nach 10 Fehlversuchen 15 Minuten Sperre pro Haushalt,
-   zusätzlich 0,5 s Verzögerung pro Fehlversuch. Unbekannte Codes antworten genauso wie
-   falsche Passwörter (kein Ausprobieren von Codes).
-5. **Eingabeprüfung** in der Datenbank (Format der IDs, Längenbegrenzungen) und in der App
-   (`store.isValid` für alles, was vom Server kommt).
-6. **Kein HTML aus Nutzereingaben** – Texte werden ausschließlich per `textContent` gesetzt.
-
-**Bewusste Grenzen:**
-- Wer **Code und Passwort** kennt, gehört zum Haushalt. Ein Passwort-Wechsel ist (noch) nicht
-  vorgesehen; im Zweifel neuen Haushalt erstellen.
-- Wer Zugriff auf ein **entsperrtes Handy** hat, sieht die Daten (wie bei jeder App).
-- Metadaten (Anzahl Einträge, Änderungszeitpunkte) sind für den Server sichtbar.
-- Supabase empfiehlt für anonyme Anmeldungen zusätzlich ein CAPTCHA gegen Missbrauch.
-  Für eine Familien-App ist die eingebaute Begrenzung (30 Anmeldungen/Stunde/IP) ausreichend.
+- **Kein eigener Server:** Die Daten liegen nur auf den Geräten und im geteilten iCloud-Ordner.
+  GitHub Pages liefert nur die App-Dateien aus und sieht keine Ausgaben.
+- **Zugriff** auf die Sync-Datei haben nur Personen, mit denen der Ordner geteilt ist
+  (sowie Apple als iCloud-Anbieter). Die Datei selbst ist nicht zusätzlich verschlüsselt.
+- **Eingaben aus Dateien werden geprüft** (`format`, `version`, `store.isValid`, Gerätenamen
+  auf 40 Zeichen gekürzt) und nur per `textContent` angezeigt – eine manipulierte Datei kann
+  keinen Code ausführen.
+- **Wer Zugriff auf ein entsperrtes Handy hat**, sieht die Daten (wie bei jeder App).
 
 ## Offline & Installation (PWA)
 
@@ -250,6 +209,9 @@ Mehrere unabhängige Schutzschichten:
 - iOS-Meta-Tags (`apple-mobile-web-app-capable`, `apple-touch-icon`).
 - `sw.js` speichert alle App-Dateien; die App startet auch im Flugmodus.
 - Abstände berücksichtigen Notch und Home-Leiste (`env(safe-area-inset-*)`).
+- **Wichtig auf dem iPhone:** Home-Bildschirm-App und Safari haben **getrennte Speicher**.
+  Safari kann Daten von Webseiten nach längerer Nichtnutzung löschen – Home-Bildschirm-Apps
+  sind davon ausgenommen.
 - **Neue Version veröffentlichen:** Dateien ändern und hochladen. Durch „Netz zuerst“ sehen
   alle Geräte beim nächsten Start mit Internet automatisch die neue Version. Bei Änderungen an
   der Dateiliste in `sw.js` den `CACHE_NAME` hochzählen.
@@ -264,14 +226,13 @@ cd haushaltsplan
 ```
 
 - Kein Build: Datei ändern → Browser neu laden.
-- Für Sync-Tests lokal einfach dieselbe `config.js` verwenden wie online.
+- Sync am Computer testen: in beiden Fenstern synchronisieren und dieselbe Datei
+  (z. B. in `~/Haushaltsplan-Sync/`) öffnen bzw. überschreiben.
 - **Neue Kategorie-Symbole:** `ICONS` oben in `js/app.js`.
 - **Standard-Kategorien:** `DEFAULT_SECTIONS` in `js/store.js` (feste IDs beibehalten!).
-- **Sync-Intervall:** `SYNC_EVERY_MS` in `js/sync.js`.
 - **Neues Feld in Ausgaben:** in `store.isValid` erlauben, beim Anlegen in `app.js` setzen,
-  in `createExpenseRow` anzeigen. Am Server ist nichts zu ändern (Inhalt ist verschlüsselt).
-- **Datenbank ändern:** `supabase/setup.sql` anpassen (idempotent halten:
-  `if not exists`, `create or replace`, `drop … if exists`).
+  in `createExpenseRow` anzeigen. Ältere App-Versionen ignorieren unbekannte Felder.
+- **Dateiformat inkompatibel ändern:** `SYNC_VERSION` in `js/sync.js` erhöhen.
 
 ### Code-Stil
 - Kommentare und Oberfläche auf Deutsch, Bezeichner auf Englisch.
@@ -279,22 +240,27 @@ cd haushaltsplan
 
 ## Tests
 
-Bei der Entwicklung wurde getestet (Chromium per Playwright, Postgres 16):
+Bei der Entwicklung getestet (Chromium per Playwright, Teilen-Menü des iPhones simuliert):
 
 | Bereich | Geprüft |
 |---|---|
-| Datenbank | `setup.sql` mehrfach ausführbar; Fremde sehen/schreiben nichts; falsches Passwort → `wrong`; 10 Fehlversuche → `locked`; ältere Version überschreibt neuere nicht; kein Löschen von Records; nur eigener Mitglieds-Eintrag löschbar; `anon` ohne Zugriff |
-| Ende-zu-Ende | Zwei Geräte gegen einen Supabase-Nachbau mit echter Postgres-Datenbank und RLS: Haushalt erstellen, falsches/richtiges Passwort, Ausgaben/Löschungen/Kategorien in beide Richtungen, Gerätenamen, **kein Klartext in der Datenbank**, verlorene Anmeldung → automatisches Neu-Beitreten, Verlassen (lokale Daten bleiben), Neuladen |
-| Oberfläche | Hinzufügen, Löschen, Rückgängig, Kategorie löschen nur mit „Löschen“, Datumsauswahl (heute/gestern/frei, keine Zukunft), Fehlermeldungen, Zustand ohne `config.js` |
+| Sync | Erstes Gerät legt Datei an; zweites Gerät übernimmt Einträge und ergänzt eigene; Löschungen kommen beim anderen an; beide Geräte haben am Ende dieselbe Summe; Geräteliste mit Namen; falsche Datei wird abgelehnt und Speichern bleibt gesperrt |
+| Oberfläche | Hinzufügen, Löschen, Rückgängig, Kategorie löschen nur mit „Löschen“, Datumsauswahl (heute/gestern/frei, keine Zukunft), Fehlermeldungen, Statuspunkt |
 
-Nicht automatisch getestet (nur mit echtem Konto/Gerät möglich): echter Supabase-Server,
-Safari auf dem iPhone, „Zum Home-Bildschirm“.
+Nicht automatisch testbar: echtes iPhone (Dateien-App, Teilen-Menü, iCloud-Freigabe).
 
 ## Bekannte Grenzen & Ideen
 
+- Abgleich nur manuell (Safari-Beschränkung).
 - Tombstones (gelöschte Einträge) werden nie aufgeräumt – bei Familiengröße unkritisch.
-- Kein Passwort-Wechsel für den Haushalt.
 - Ausgaben können (noch) nicht bearbeitet werden – nur löschen und neu anlegen.
-- Supabase-Free-Plan pausiert nach ~7 Tagen ohne Nutzung.
-- Ideen: Monatsübersicht/Diagramme, Ausgaben bearbeiten, Export als CSV, Budget pro Kategorie,
-  Dark Mode.
+- Die Sync-Datei ist nicht zusätzlich verschlüsselt (Schutz über die iCloud-Freigabe).
+- Ideen: Erinnerung zum Synchronisieren, Monatsübersicht/Diagramme, Ausgaben bearbeiten,
+  CSV-Export, Budget pro Kategorie, Dark Mode.
+
+## Versionsgeschichte
+
+| Stand | Änderung |
+|---|---|
+| 22.11.2026 | Sync auf **iCloud Drive** umgestellt (Sync-Datei, 2 Schritte); Supabase entfernt |
+| 17.11.2026 | Web-App mit verschlüsseltem Supabase-Sync, Datumsauswahl, PWA |

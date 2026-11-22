@@ -149,3 +149,17 @@ test('Statuspunkt: auch wenn die Uhr eines anderen Handys vorgeht, ist nach dem 
 
   assert.equal(alfred.sync.unsyncedCount(), 0, 'Änderung steckt schon in der Datei, Punkt bleibt aber gelb');
 });
+
+test('Statuspunkt: neue Ausgabe direkt nach dem Speichern zählt als offen – auch wenn eine fremde Uhr vorgeht', async () => {
+  const oskar = neuesGeraet({ now: 1_800_000_600_000 }); // 10 Minuten vor
+  const alfred = neuesGeraet({ now: 1_800_000_000_000 });
+  mitSpeicherFenster(alfred);
+
+  ausgabe(oskar, { id: 'eis' });
+  await alfred.sync.importFiles([oskar.sync.buildFile()]);
+  await alfred.sync.exportFile();
+
+  alfred.tick();
+  ausgabe(alfred, { id: 'bus' });
+  assert.equal(alfred.sync.unsyncedCount(), 1, 'neue Ausgabe muss als offen gelten');
+});

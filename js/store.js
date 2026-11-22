@@ -24,6 +24,9 @@ const DEFAULT_SECTIONS = [
 
 const makeId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
+// Nur eigene Einträge des Objekts – nicht eingebaute wie "constructor" oder "toString"
+const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+
 const store = {
   data: null,     // { deviceId, profile, records: { id: record }, sync: {...} }
   onChange: null, // wird von app.js gesetzt: z. B. Anzeige "noch nicht synchronisiert" aktualisieren
@@ -109,7 +112,7 @@ const store = {
 
   // ----- Lesen -----
   get(id) {
-    return this.data.records[id];
+    return hasOwn(this.data.records, id) ? this.data.records[id] : undefined;
   },
 
   isLive(id) {
@@ -138,10 +141,12 @@ const store = {
   // ----- Ändern -----
   stamp(rec) {
     const prev = this.get(rec.id);
+    // immer später als die vorige Version UND als das letzte Speichern in die Sync-Datei
+    // (beides kann bei falsch gehender Uhr eines anderen Handys in der Zukunft liegen)
     return {
       deleted: false,
       ...rec,
-      updatedAt: Math.max(Date.now(), (prev ? prev.updatedAt : 0) + 1),
+      updatedAt: Math.max(Date.now(), (prev ? prev.updatedAt : 0) + 1, (this.data.sync.exportedAt || 0) + 1),
       device: this.data.deviceId,
     };
   },
@@ -182,13 +187,17 @@ const store = {
   isValid(r) {
     if (!r || typeof r !== 'object') return false;
     if (typeof r.id !== 'string' || !/^[A-Za-z0-9_-]{1,40}$/.test(r.id)) return false;
-    if (typeof r.updatedAt !== 'number') return false;
+    // isFinite: auch Infinity (aus "1e999" in der Datei) ablehnen – so ein Eintrag wäre nie mehr änderbar
+    if (!Number.isFinite(r.updatedAt)) return false;
+    if (r.deleted !== undefined && typeof r.deleted !== 'boolean') return false;
     if (r.type === 'section') {
-      return typeof r.name === 'string' && typeof r.icon === 'string' && typeof r.createdAt === 'number';
+      return typeof r.name === 'string' && typeof r.icon === 'string' && Number.isFinite(r.createdAt);
     }
     if (r.type === 'expense') {
+      // gleiche Grenzen wie bei der Eingabe in app.js (parseAmount)
       return typeof r.title === 'string' && typeof r.sectionId === 'string'
-        && Number.isInteger(r.cents) && typeof r.date === 'string';
+        && Number.isInteger(r.cents) && r.cents > 0 && r.cents < 1e9
+        && typeof r.date === 'string' && !Number.isNaN(Date.parse(r.date));
     }
     return false;
   },

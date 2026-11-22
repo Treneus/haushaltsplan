@@ -87,7 +87,7 @@ const sync = {
     const own = store.data.sync.devices;
     for (const [id, d] of Object.entries(devices)) {
       if (!/^[A-Za-z0-9_-]{1,40}$/.test(id) || !d || typeof d.name !== 'string' || typeof d.lastSync !== 'number') continue;
-      if (!own[id] || d.lastSync > own[id].lastSync) own[id] = { name: d.name.slice(0, 40), lastSync: d.lastSync };
+      if (!hasOwn(own, id) || d.lastSync > own[id].lastSync) own[id] = { name: d.name.slice(0, 40), lastSync: d.lastSync };
     }
   },
 
@@ -122,6 +122,10 @@ const sync = {
 
   // Rückgabe: 'saved' | 'cancelled'
   async exportFile() {
+    // Neuester Zeitstempel in der Datei. Kann in der Zukunft liegen, wenn die Uhr
+    // eines anderen Handys vorgeht – sonst bliebe der Statuspunkt danach gelb.
+    const newest = Object.values(store.data.records)
+      .reduce((max, r) => Math.max(max, r.updatedAt || 0), 0);
     const file = this.buildFile();
     const method = this.saveMethod();
     try {
@@ -149,8 +153,8 @@ const sync = {
       if (err && err.name === 'AbortError') return 'cancelled';
       throw err;
     }
-    store.data.sync.exportedAt = Date.now();
-    store.data.sync.lastSync = store.data.sync.exportedAt;
+    store.data.sync.lastSync = Date.now();
+    store.data.sync.exportedAt = Math.max(store.data.sync.lastSync, newest);
     store.save();
     this.onUpdate();
     return 'saved';

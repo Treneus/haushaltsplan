@@ -240,6 +240,25 @@ cd haushaltsplan
 
 ## Tests
 
+### Automatische Tests
+
+Die Logik in `store.js`, `sync.js` und die Betragseingabe (`parseAmount` aus `app.js`)
+werden mit dem eingebauten Test-Runner von Node.js geprüft – ohne zusätzliche Pakete.
+Jeder Test bekommt ein eigenes, frisches „Gerät“ (eigener `localStorage`, steuerbare Uhr).
+
+```bash
+node --test       # benötigt Node.js 18 oder neuer
+```
+
+| Datei | Prüft |
+|---|---|
+| `tests/store.test.js` | Speichern/Neustart, Löschen/Rückgängig, Kategorie löschen, Sortierung, `isValid`, `merge`, alte Versionen |
+| `tests/sync.test.js` | Abgleich zwischen zwei Geräten, falsche Dateien, Geräteliste, Statuspunkt (auch bei falsch gehender Uhr) |
+| `tests/betrag.test.js` | Betragseingabe in Cent, Rundung, ungültige und zu große Beträge |
+| `tests/helfer.js` | baut die Testgeräte |
+
+### Manuell
+
 Bei der Entwicklung getestet (Chromium per Playwright, Teilen-Menü des iPhones simuliert):
 
 | Bereich | Geprüft |
@@ -262,5 +281,6 @@ Nicht automatisch testbar: echtes iPhone (Dateien-App, Teilen-Menü, iCloud-Frei
 
 | Stand | Änderung |
 |---|---|
+| 22.11.2026 | Automatische Tests; Fehler behoben: IDs wie „constructor“, strengere Prüfung von Sync-Einträgen, Statuspunkt bei falsch gehender Uhr |
 | 22.11.2026 | Sync auf **iCloud Drive** umgestellt (Sync-Datei, 2 Schritte); Supabase entfernt |
 | 17.11.2026 | Web-App mit verschlüsseltem Supabase-Sync, Datumsauswahl, PWA |

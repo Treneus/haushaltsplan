@@ -13,7 +13,9 @@
 // ----- Einstellungen -----
 const SWIPE_DELETE_PX = 110; // so weit nach links wischen = löschen
 const CONFIRM_WORD = 'löschen';
-const USERNAME_RE = /^[A-Za-z0-9ÄÖÜäöüß_.-]{3,20}$/;
+// Name: 3–30 Zeichen, Buchstaben (auch é, ñ …), Zahlen, _ . - und einzelne Leerzeichen
+// zwischen den Wörtern – z. B. "Christian Krause"
+const USERNAME_RE = /^(?=.{3,30}$)[\p{L}\p{N}_.-]+(?: [\p{L}\p{N}_.-]+)*$/u;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const ICONS = ['🍔', '🥤', '🎮', '🚌', '🛒', '🏠', '👕', '🎁', '📚', '⚽', '🐶', '📦'];
 
@@ -608,11 +610,11 @@ function flashButton(btn, text) {
 
 $('#profileForm').addEventListener('submit', (ev) => {
   ev.preventDefault();
-  const username = usernameIn.value.trim();
+  const username = usernameIn.value.trim().replace(/\s+/g, ' '); // doppelte Leerzeichen → eins
   const email = emailIn.value.trim();
   let ok = true;
   if (!USERNAME_RE.test(username)) {
-    flagError(usernameIn, '3–20 Zeichen: Buchstaben, Zahlen, _ . - (keine Leerzeichen)');
+    flagError(usernameIn, '3–30 Zeichen: Buchstaben, Zahlen, Leerzeichen, _ . -');
     ok = false;
   }
   if (email && !EMAIL_RE.test(email)) {

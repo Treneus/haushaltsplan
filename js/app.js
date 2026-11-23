@@ -772,10 +772,12 @@ store.onChange = renderSync; // Zähler "noch nicht in iCloud" aktuell halten
 // =========================================================
 //  KNÖPFE & TASTEN
 // =========================================================
+// Runder +-Knopf: nur noch in einer Kategorie (neue Ausgabe)
 fab.addEventListener('click', () => {
   if (currentScreen === 'detail') openExpenseSheet();
-  else if (currentScreen === 'home') openSheet(sectionSheet, sectionNameIn);
 });
+// Langer Knopf unter der Liste auf der Übersicht: neue Kategorie
+$('#addSectionBtn').addEventListener('click', () => openSheet(sectionSheet, sectionNameIn));
 $('#settingsBtn').addEventListener('click', openSettings);
 backdrop.addEventListener('click', closeSheet);
 document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', closeSheet));

@@ -253,6 +253,28 @@ button, .row-fg, .chip span { touch-action: manipulation; }
 .fab:active { transform: scale(.92); }
 .fab.hide,
 .phone.in-settings .fab { transform: scale(0); }
+/* Auf der Übersicht gibt es keinen runden +-Knopf – dort gibt es
+   den langen Knopf "Neue Kategorie" unter der Liste (.add-row-btn) */
+.phone:not(.in-detail):not(.in-settings) .fab { transform: scale(0); pointer-events: none; }
+
+/* ===== Langer Knopf unter der Kategorien-Liste ===== */
+.add-row-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 16px;
+  border: 2px dashed rgba(91, 91, 240, .35);
+  border-radius: var(--radius);
+  background: rgba(91, 91, 240, .06);
+  color: var(--accent);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s, transform .15s var(--ease);
+}
+.add-row-btn:hover { background: rgba(91, 91, 240, .12); }
+.add-row-btn:active { transform: scale(.98); }
 
 /* ===== Fenster von unten ===== */
 .backdrop {

@@ -77,7 +77,7 @@ Der kleine Punkt am Sync-Knopf hilft:
 | Was | Wie |
 |---|---|
 | Kategorie öffnen | Kategorie antippen |
-| Kategorie hinzufügen | Auf dem Startbildschirm **+** → Name und Symbol wählen |
+| Kategorie hinzufügen | Auf dem Startbildschirm unter der Liste **„+ Neue Kategorie“** → Name und Symbol wählen |
 | Kategorie löschen | Nach links wischen oder **✕** → **„Löschen“** eintippen → bestätigen (löscht auch alle Ausgaben darin – beim nächsten Abgleich auf allen Geräten) |
 | Ausgabe hinzufügen | In einer Kategorie **+** → Betrag, Beschreibung, Datum |
 | Datum ändern | Ins Datumsfeld tippen oder **Gestern** wählen (Standard: heute) |
